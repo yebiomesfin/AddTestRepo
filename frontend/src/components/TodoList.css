@@ -1,0 +1,12 @@
+.todo-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.empty {
+  text-align: center;
+  color: #888;
+  margin-top: 20px;
+}
