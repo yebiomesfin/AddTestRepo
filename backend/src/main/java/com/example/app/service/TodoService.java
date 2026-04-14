@@ -1,7 +1,9 @@
 package com.example.app.service;
 
+import com.example.app.exception.ResourceNotFoundException;
 import com.example.app.model.Todo;
 import com.example.app.repository.TodoRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -9,34 +11,50 @@ import java.util.List;
 @Service
 public class TodoService {
 
-    private final TodoRepository todoRepository;
+    @Autowired
+    private TodoRepository todoRepository;
 
-    public TodoService(TodoRepository todoRepository) {
-        this.todoRepository = todoRepository;
-    }
-
-    public List<Todo> findAll() {
+    // Get all todos
+    public List<Todo> getAllTodos() {
         return todoRepository.findAll();
     }
 
-    public Todo findById(Long id) {
+    // Get todo by ID
+    public Todo getTodoById(Long id) {
         return todoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Todo not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Todo not found with id: " + id));
     }
 
-    public Todo create(Todo todo) {
+    // Create a new todo
+    public Todo createTodo(Todo todo) {
         return todoRepository.save(todo);
     }
 
-    public Todo update(Long id, Todo updated) {
-        Todo existing = findById(id);
-        existing.setTitle(updated.getTitle());
-        existing.setCompleted(updated.isCompleted());
-        return todoRepository.save(existing);
+    // Update existing todo
+    public Todo updateTodo(Long id, Todo todoDetails) {
+        Todo todo = getTodoById(id);
+        todo.setTitle(todoDetails.getTitle());
+        todo.setDescription(todoDetails.getDescription());
+        todo.setCompleted(todoDetails.isCompleted());
+        return todoRepository.save(todo);
     }
 
-    public void delete(Long id) {
-        Todo existing = findById(id);
-        todoRepository.delete(existing);
+    // Delete todo
+    public void deleteTodo(Long id) {
+        Todo todo = getTodoById(id);
+        todoRepository.delete(todo);
+    }
+
+    // Search todos by search term
+    public List<Todo> searchTodos(String searchTerm) {
+        if (searchTerm == null || searchTerm.trim().isEmpty()) {
+            return getAllTodos();
+        }
+        return todoRepository.searchTodos(searchTerm.trim());
+    }
+
+    // Get todos by completed status
+    public List<Todo> getTodosByStatus(boolean completed) {
+        return todoRepository.findByCompleted(completed);
     }
 }
