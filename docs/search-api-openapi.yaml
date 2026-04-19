@@ -1,0 +1,466 @@
+openapi: 3.0.3
+info:
+  title: AddTestRepo Search API
+  description: |
+    **DRAFT SPECIFICATION** for Search API endpoint tied to Jira story ADDAII-311.
+    
+    This specification defines the contract for `GET /api/v1/search` — a RESTful 
+    search endpoint supporting full-text query, pagination, sorting, and filtering.
+    
+    **Status:** Design review in progress  
+    **Jira:** [ADDAII-311](https://acuity-inc.atlassian.net/browse/ADDAII-311)
+    
+  version: 0.1.0-draft
+  contact:
+    name: API Team
+    email: yebio.mesfin@myacuity.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://api.addtestapp.example.com/v1
+    description: Production (TBD)
+  - url: https://staging-api.addtestapp.example.com/v1
+    description: Staging
+
+tags:
+  - name: search
+    description: Search and discovery operations
+
+paths:
+  /search:
+    get:
+      summary: Search for items
+      description: |
+        Perform a full-text search with optional filtering, sorting, and pagination.
+        
+        **Authentication:** Requires Bearer JWT with `search:read` scope.
+        **Rate Limit:** TBD requests per minute per user.
+      operationId: searchItems
+      tags:
+        - search
+      security:
+        - bearerAuth: [search:read]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Free-text search query (1-256 characters)
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 256
+          example: "example search term"
+        
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-based, default 1)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          example: 1
+        
+        - name: limit
+          in: query
+          required: false
+          description: Results per page (1-100, default 20)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 20
+        
+        - name: sort
+          in: query
+          required: false
+          description: |
+            Sort field(s), comma-separated. Prefix with `-` for descending order.
+            Allowed fields: TBD (e.g., `title`, `createdAt`, `relevance`)
+          schema:
+            type: string
+            default: "-relevance"
+          example: "title,-createdAt"
+        
+        - name: filter
+          in: query
+          required: false
+          description: |
+            Field-level filters, comma-separated `field:value` pairs.
+            Allowed fields: TBD (e.g., `category`, `status`)
+          schema:
+            type: string
+          example: "category:docs,status:active"
+        
+        - name: fields
+          in: query
+          required: false
+          description: |
+            Sparse fieldset — comma-separated field names to include in response.
+            If omitted, all fields are returned.
+          schema:
+            type: string
+          example: "id,title,category"
+      
+      responses:
+        '200':
+          description: Search results returned successfully
+          headers:
+            X-RateLimit-Limit:
+              description: Total rate limit
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              description: Remaining requests in current window
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              description: Unix timestamp when rate limit resets
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+              example:
+                status: "success"
+                data:
+                  - id: "abc-123"
+                    title: "Example Item"
+                    description: "A matching result..."
+                    category: "docs"
+                    score: 0.98
+                    createdAt: "2026-04-01T12:00:00Z"
+                    updatedAt: "2026-04-15T08:30:00Z"
+                pagination:
+                  page: 1
+                  limit: 20
+                  totalResults: 142
+                  totalPages: 8
+                  hasNextPage: true
+                  hasPrevPage: false
+                meta:
+                  query: "example"
+                  appliedFilters:
+                    category: "docs"
+                  appliedSort: "-relevance"
+                  requestId: "req-uuid-001"
+                  responseTimeMs: 45
+        
+        '400':
+          description: Bad request (invalid parameters)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingQuery:
+                  value:
+                    status: "error"
+                    error:
+                      code: "MISSING_QUERY"
+                      message: "Query parameter 'q' is required."
+                      details: []
+                      requestId: "req-uuid-002"
+                invalidQueryLength:
+                  value:
+                    status: "error"
+                    error:
+                      code: "INVALID_QUERY_LENGTH"
+                      message: "Query parameter 'q' must be between 1 and 256 characters."
+                      details: []
+                      requestId: "req-uuid-003"
+                invalidPagination:
+                  value:
+                    status: "error"
+                    error:
+                      code: "INVALID_PAGINATION"
+                      message: "Parameter 'page' must be >= 1 and 'limit' must be between 1 and 100."
+                      details: []
+                      requestId: "req-uuid-004"
+                invalidField:
+                  value:
+                    status: "error"
+                    error:
+                      code: "INVALID_FIELD"
+                      message: "Unknown field in 'sort' or 'filter' parameter."
+                      details: []
+                      requestId: "req-uuid-005"
+        
+        '401':
+          description: Unauthorized (missing or invalid token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: "error"
+                error:
+                  code: "UNAUTHORIZED"
+                  message: "Missing or invalid authentication token."
+                  details: []
+                  requestId: "req-uuid-006"
+        
+        '403':
+          description: Forbidden (insufficient permissions)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: "error"
+                error:
+                  code: "FORBIDDEN"
+                  message: "Insufficient permissions. Required scope: search:read"
+                  details: []
+                  requestId: "req-uuid-007"
+        
+        '429':
+          description: Too many requests (rate limit exceeded)
+          headers:
+            Retry-After:
+              description: Seconds until rate limit resets
+              schema:
+                type: integer
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: "error"
+                error:
+                  code: "RATE_LIMIT_EXCEEDED"
+                  message: "Rate limit exceeded. Retry after 60 seconds."
+                  details: []
+                  requestId: "req-uuid-008"
+        
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: "error"
+                error:
+                  code: "INTERNAL_ERROR"
+                  message: "An unexpected error occurred. Please try again later."
+                  details: []
+                  requestId: "req-uuid-009"
+        
+        '503':
+          description: Service unavailable (search backend down)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: "error"
+                error:
+                  code: "SERVICE_UNAVAILABLE"
+                  message: "Search service is temporarily unavailable."
+                  details: []
+                  requestId: "req-uuid-010"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT Bearer token with `search:read` scope.
+        Obtain from the authentication provider (TBD).
+  
+  schemas:
+    SearchResponse:
+      type: object
+      required:
+        - status
+        - data
+        - pagination
+        - meta
+      properties:
+        status:
+          type: string
+          enum: [success]
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchItem'
+        pagination:
+          $ref: '#/components/schemas/PaginationMetadata'
+        meta:
+          $ref: '#/components/schemas/ResponseMetadata'
+    
+    SearchItem:
+      type: object
+      description: |
+        A single search result item.
+        **Note:** Exact fields TBD — depends on searchable entity definition.
+      properties:
+        id:
+          type: string
+          description: Unique identifier
+        title:
+          type: string
+          description: Item title
+        description:
+          type: string
+          description: Item description
+        category:
+          type: string
+          description: Item category (e.g., docs, tutorials)
+        status:
+          type: string
+          description: Item status (e.g., active, archived)
+        score:
+          type: number
+          format: float
+          description: Relevance score (0.0 - 1.0)
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp (ISO 8601)
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp (ISO 8601)
+      required:
+        - id
+        - title
+    
+    PaginationMetadata:
+      type: object
+      required:
+        - page
+        - limit
+        - totalResults
+        - totalPages
+        - hasNextPage
+        - hasPrevPage
+      properties:
+        page:
+          type: integer
+          description: Current page number
+        limit:
+          type: integer
+          description: Results per page
+        totalResults:
+          type: integer
+          description: Total number of matching results
+        totalPages:
+          type: integer
+          description: Total number of pages
+        hasNextPage:
+          type: boolean
+          description: Whether a next page exists
+        hasPrevPage:
+          type: boolean
+          description: Whether a previous page exists
+    
+    ResponseMetadata:
+      type: object
+      required:
+        - query
+        - requestId
+        - responseTimeMs
+      properties:
+        query:
+          type: string
+          description: The original search query
+        appliedFilters:
+          type: object
+          additionalProperties:
+            type: string
+          description: Filters applied to the search
+        appliedSort:
+          type: string
+          description: Sort order applied
+        requestId:
+          type: string
+          description: Unique request identifier for tracing
+        responseTimeMs:
+          type: integer
+          description: Server-side response time in milliseconds
+    
+    ErrorResponse:
+      type: object
+      required:
+        - status
+        - error
+      properties:
+        status:
+          type: string
+          enum: [error]
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+    
+    ErrorDetail:
+      type: object
+      required:
+        - code
+        - message
+        - requestId
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code
+          enum:
+            - MISSING_QUERY
+            - INVALID_QUERY_LENGTH
+            - INVALID_PAGINATION
+            - INVALID_FIELD
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - RATE_LIMIT_EXCEEDED
+            - INTERNAL_ERROR
+            - SERVICE_UNAVAILABLE
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: array
+          description: Additional error details (field-level validation errors)
+          items:
+            type: object
+        requestId:
+          type: string
+          description: Unique request identifier for support/debugging
+
+# --- END OF DRAFT OPENAPI SPECIFICATION ---
+# 
+# PENDING DESIGN DECISIONS:
+# 
+# 1. **Searchable Entity & Fields:** Define the actual resource (e.g., Document, Product, User)
+#    and confirm field whitelist for search, sort, and filter operations.
+# 
+# 2. **Auth Scope:** Confirm `search:read` scope name with platform/security team.
+# 
+# 3. **Rate Limits:** Define specific rate limit values per tier (e.g., 100 req/min, 500 req/min).
+# 
+# 4. **Search Backend:** Confirm technology (Elasticsearch, OpenSearch, PostgreSQL FTS) to
+#    finalize relevance scoring and performance characteristics.
+# 
+# 5. **Performance SLOs:** Validate P95 ≤ 200ms target is achievable given data volume and
+#    search complexity.
+# 
+# 6. **Allowed Sort/Filter Fields:** Finalize whitelist based on entity definition and indexing strategy.
+# 
+# 7. **Sparse Fieldsets:** Confirm whether `fields` parameter is required for MVP or deferred.
+# 
+# NEXT STEPS:
+# - Design review with stakeholders
+# - Update specification based on feedback
+# - Obtain sign-off before implementation begins on feature/ADDAII-311-search-api branch
