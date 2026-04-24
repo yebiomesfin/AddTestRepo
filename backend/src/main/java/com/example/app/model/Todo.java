@@ -1,8 +1,13 @@
 package com.example.app.model;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
+/**
+ * Todo entity representing a single todo item.
+ * Contains all fields required for search filtering.
+ */
 @Entity
 @Table(name = "todos")
 public class Todo {
@@ -11,26 +16,102 @@ public class Todo {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank(message = "Title must not be blank")
-    @Column(nullable = false)
+    @Column(nullable = false, length = 255)
     private String title;
 
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private boolean completed = false;
+    private TodoStatus status = TodoStatus.PENDING;
 
-    public Todo() {}
+    @Column(name = "due_date")
+    private LocalDate dueDate;
 
-    public Todo(String title, boolean completed) {
-        this.title = title;
-        this.completed = completed;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    // Lifecycle callbacks
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
     }
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 
-    public String getTitle() { return title; }
-    public void setTitle(String title) { this.title = title; }
+    // Constructors
+    public Todo() {
+    }
 
-    public boolean isCompleted() { return completed; }
-    public void setCompleted(boolean completed) { this.completed = completed; }
+    public Todo(String title, String description, TodoStatus status, LocalDate dueDate) {
+        this.title = title;
+        this.description = description;
+        this.status = status;
+        this.dueDate = dueDate;
+    }
+
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public TodoStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(TodoStatus status) {
+        this.status = status;
+    }
+
+    public LocalDate getDueDate() {
+        return dueDate;
+    }
+
+    public void setDueDate(LocalDate dueDate) {
+        this.dueDate = dueDate;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 }
