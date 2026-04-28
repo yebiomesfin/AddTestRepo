@@ -1,7 +1,8 @@
 package com.example.app.model;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "todos")
@@ -11,26 +12,46 @@ public class Todo {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank(message = "Title must not be blank")
-    @Column(nullable = false)
     private String title;
 
-    @Column(nullable = false)
-    private boolean completed = false;
+    @Enumerated(EnumType.STRING)
+    private TodoStatus status;
 
-    public Todo() {}
+    private LocalDate dueDate;
 
-    public Todo(String title, boolean completed) {
-        this.title = title;
-        this.completed = completed;
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        if (status == null) {
+            status = TodoStatus.PENDING;
+        }
     }
 
+    // Constructors
+    public Todo() {}
+
+    public Todo(String title, TodoStatus status, LocalDate dueDate) {
+        this.title = title;
+        this.status = status;
+        this.dueDate = dueDate;
+    }
+
+    // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
 
-    public boolean isCompleted() { return completed; }
-    public void setCompleted(boolean completed) { this.completed = completed; }
+    public TodoStatus getStatus() { return status; }
+    public void setStatus(TodoStatus status) { this.status = status; }
+
+    public LocalDate getDueDate() { return dueDate; }
+    public void setDueDate(LocalDate dueDate) { this.dueDate = dueDate; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }
